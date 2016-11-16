@@ -140,6 +140,19 @@ PDAL_DLL uint8_t computeRank(PointView& view, std::vector<PointId> ids,
                              double threshold);
 
 /**
+ * \brief Thin Plate Splint interpolation.
+ *
+ * \param x the x coordinate of the input data.
+ * \param y the y coordinate of the input data.
+ * \param z the z coordinate of the input data.
+ * \param xx the x coordinate of the points to be interpolated.
+ * \param yy the y coordinate of the points to be interpolated.
+ * \return the values of the interpolated data at xx and yy.
+ */
+PDAL_DLL Eigen::MatrixXd computeSpline(Eigen::MatrixXd x, Eigen::MatrixXd y,
+                                       Eigen::MatrixXd z, Eigen::MatrixXd xx,
+                                       Eigen::MatrixXd yy);
+/**
  * /brief Create matrix of minimum Z values.
  *
  * Create a DSM from the provided PointVieew, where each cell contains the

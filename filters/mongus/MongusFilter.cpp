@@ -43,10 +43,6 @@
 
 #include <Eigen/Dense>
 
-#include "gdal_priv.h" // For File I/O
-#include "gdal_version.h" // For version info
-#include "ogr_spatialref.h"  //For Geographic Information/Transformations
-
 namespace pdal
 {
 

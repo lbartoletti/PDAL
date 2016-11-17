@@ -39,6 +39,10 @@
 
 #include <Eigen/Dense>
 
+#include "gdal_priv.h" // For File I/O
+#include "gdal_version.h" // For version info
+#include "ogr_spatialref.h"  //For Geographic Information/Transformations
+
 #include <vector>
 
 namespace pdal
@@ -123,8 +127,59 @@ Eigen::MatrixXd createDSM(PointView& view, int rows, int cols, double cell_size,
         if (z < ZImin(r, c) || std::isnan(ZImin(r, c)))
             ZImin(r, c) = z;
     }
-
+    
     return ZImin;
+}
+
+Eigen::MatrixXd extendedLocalMinimum(PointView& view, int rows, int cols,
+                                     double cell_size, BOX2D bounds)
+{
+  using namespace Dimension;
+  using namespace Eigen;
+
+  // Index elevation values by row and column.
+  std::map<uint32_t, std::vector<double>> hash;
+  for (PointId i = 0; i < view.size(); ++i)
+  {
+      double x = view.getFieldAs<double>(Id::X, i);
+      double y = view.getFieldAs<double>(Id::Y, i);
+      double z = view.getFieldAs<double>(Id::Z, i);
+
+      int c = Utils::clamp(static_cast<int>(floor(x-bounds.minx)/cell_size), 0, cols-1);
+      int r = Utils::clamp(static_cast<int>(floor(y-bounds.miny)/cell_size), 0, rows-1);
+      
+      hash[r*cols+c].push_back(z);
+  }
+  
+  // For each grid cell, sort elevations and detect local minimum, rejecting low
+  // outliers.
+  MatrixXd ZImin(rows, cols);
+  ZImin.setConstant(std::numeric_limits<double>::quiet_NaN());
+  for (int c = 0; c < cols; ++c)
+  {
+      for (int r = 0; r < rows; ++r)
+      {
+          std::vector<double> cp(hash[r*cols+c]);
+          if (cp.empty())
+              continue;
+          std::sort(cp.begin(), cp.end());
+          if (cp.size() == 1)
+          {
+              ZImin(r, c) = cp[0];
+              continue;
+          }
+          for (size_t i = 0; i < cp.size()-1; ++i)
+          {
+              if (std::fabs(cp[i] - cp[i+1]) < 1.0)
+              {
+                  ZImin(r, c) = cp[i];
+                  break;
+              }
+          }
+      }
+  }
+
+  return ZImin;
 }
 
 Eigen::MatrixXd matrixClose(Eigen::MatrixXd data, int radius)
@@ -277,6 +332,99 @@ PDAL_DLL Eigen::MatrixXd pointViewToEigen(const PointView& view)
         matrix(i, 2) = view.getFieldAs<double>(Dimension::Id::Z, i);
     }
     return matrix;
+}
+
+void writeMatrix(Eigen::MatrixXd data, std::string filename, double cell_size,
+                 PointViewPtr view, BOX2D bounds)
+{
+    int cols = data.cols();
+    int rows = data.rows();
+
+    GDALAllRegister();
+
+    GDALDataset *mpDstDS = NULL;
+
+    char **papszMetadata;
+
+    // parse the format driver, hardcoded for the time being
+    std::string tFormat("GTIFF");
+    const char *pszFormat = tFormat.c_str();
+    GDALDriver* tpDriver = GetGDALDriverManager()->GetDriverByName(pszFormat);
+
+    // try to create a file of the requested format
+    if (tpDriver != NULL)
+    {
+        papszMetadata = tpDriver->GetMetadata();
+        if (CSLFetchBoolean(papszMetadata, GDAL_DCAP_CREATE, FALSE))
+        {
+            char **papszOptions = NULL;
+
+            mpDstDS = tpDriver->Create(filename.c_str(), cols, rows, 1,
+                                       GDT_Float32, papszOptions);
+
+            // set the geo transformation
+            double adfGeoTransform[6];
+            adfGeoTransform[0] = bounds.minx;
+            adfGeoTransform[1] = cell_size;
+            adfGeoTransform[2] = 0.0;
+            adfGeoTransform[3] = bounds.miny;
+            adfGeoTransform[4] = 0.0;
+            adfGeoTransform[5] = cell_size;
+            mpDstDS->SetGeoTransform(adfGeoTransform);
+
+            // set the projection
+            mpDstDS->SetProjection(view->spatialReference().getWKT().c_str());
+        }
+    }
+
+    // if we have a valid file
+    if (mpDstDS)
+    {
+        // loop over the raster and determine max slope at each location
+        int cs = 1, ce = cols - 1;
+        int rs = 1, re = rows - 1;
+        float *poRasterData = new float[cols*rows];
+        for (auto i=0; i<cols*rows; i++)
+        {
+            poRasterData[i] = std::numeric_limits<float>::min();
+        }
+
+        // #pragma omp parallel for
+        for (auto c = cs; c < ce; ++c)
+        {
+            for (auto r = rs; r < re; ++r)
+            {
+                if (data(r, c) == 0.0 || std::isnan(data(r, c)) || data(r, c) == std::numeric_limits<double>::max())
+                    continue;
+                poRasterData[(r * cols) + c] =
+                    data(r, c);
+            }
+        }
+
+        // write the data
+        if (poRasterData)
+        {
+            GDALRasterBand *tBand = mpDstDS->GetRasterBand(1);
+
+            tBand->SetNoDataValue(std::numeric_limits<float>::min());
+
+            if (cols > 0 && rows > 0)
+#if GDAL_VERSION_MAJOR <= 1
+                tBand->RasterIO(GF_Write, 0, 0, cols, rows,
+                                poRasterData, cols, rows,
+                                GDT_Float32, 0, 0);
+#else
+
+                int ret = tBand->RasterIO(GF_Write, 0, 0, cols, rows,
+                                          poRasterData, cols, rows,
+                                          GDT_Float32, 0, 0, 0);
+#endif
+        }
+
+        GDALClose((GDALDatasetH) mpDstDS);
+
+        delete [] poRasterData;
+    }
 }
 
 } // namespace eigen

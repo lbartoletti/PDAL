@@ -87,11 +87,12 @@
 
 // writers
 #include <bpf/BpfWriter.hpp>
+#include <derivative/DerivativeWriter.hpp>
 #include <gdal/GDALWriter.hpp>
 #include <las/LasWriter.hpp>
 #include <ply/PlyWriter.hpp>
 #include <sbet/SbetWriter.hpp>
-#include <derivative/DerivativeWriter.hpp>
+#include <slope/SlopeWriter.hpp>
 #include <text/TextWriter.hpp>
 #include <null/NullWriter.hpp>
 
@@ -135,6 +136,7 @@ StringList StageFactory::extensions(const std::string& driver)
         { "writers.ply", { "ply" } },
         { "writers.sbet", { "sbet" } },
         { "writers.derivative", { "derivative" } },
+        { "writers.slope", { "slope" } },
         { "writers.sqlite", { "sqlite" } },
     };
 
@@ -208,6 +210,7 @@ std::string StageFactory::inferWriterDriver(const std::string& filename)
         { "ply", "writers.ply" },
         { "sbet", "writers.sbet" },
         { "derivative", "writers.derivative" },
+        { "slope", "writers.slope" },
         { "sqlite", "writers.sqlite" },
         { "txt", "writers.text" },
         { "xyz", "writers.text" },
@@ -281,11 +284,12 @@ StageFactory::StageFactory(bool no_plugins)
 
     // writers
     PluginManager::initializePlugin(BpfWriter_InitPlugin);
+    PluginManager::initializePlugin(DerivativeWriter_InitPlugin);
     PluginManager::initializePlugin(GDALWriter_InitPlugin);
     PluginManager::initializePlugin(LasWriter_InitPlugin);
     PluginManager::initializePlugin(PlyWriter_InitPlugin);
     PluginManager::initializePlugin(SbetWriter_InitPlugin);
-    PluginManager::initializePlugin(DerivativeWriter_InitPlugin);
+    PluginManager::initializePlugin(SlopeWriter_InitPlugin);
     PluginManager::initializePlugin(TextWriter_InitPlugin);
     PluginManager::initializePlugin(NullWriter_InitPlugin);
 }

@@ -106,8 +106,8 @@ uint8_t computeRank(PointView& view, std::vector<PointId> ids, double threshold)
     return static_cast<uint8_t>(svd.rank());
 }
 
-Eigen::MatrixXd createDSM(PointView& view, int rows, int cols, double cell_size,
-                          BOX2D bounds)
+Eigen::MatrixXd createMinMatrix(PointView& view, int rows, int cols,
+                                double cell_size, BOX2D bounds)
 {
     using namespace Dimension;
     using namespace Eigen;
@@ -129,6 +129,31 @@ Eigen::MatrixXd createDSM(PointView& view, int rows, int cols, double cell_size,
     }
     
     return ZImin;
+}
+
+Eigen::MatrixXd createMaxMatrix(PointView& view, int rows, int cols,
+                                double cell_size, BOX2D bounds)
+{
+    using namespace Dimension;
+    using namespace Eigen;
+
+    MatrixXd ZImax(rows, cols);
+    ZImax.setConstant(std::numeric_limits<double>::quiet_NaN());
+    
+    for (PointId i = 0; i < view.size(); ++i)
+    {
+        double x = view.getFieldAs<double>(Id::X, i);
+        double y = view.getFieldAs<double>(Id::Y, i);
+        double z = view.getFieldAs<double>(Id::Z, i);
+
+        int c = Utils::clamp(static_cast<int>(floor(x-bounds.minx)/cell_size), 0, cols-1);
+        int r = Utils::clamp(static_cast<int>(floor(y-bounds.miny)/cell_size), 0, rows-1);
+        
+        if (z > ZImax(r, c) || std::isnan(ZImax(r, c)))
+            ZImax(r, c) = z;
+    }
+    
+    return ZImax;
 }
 
 Eigen::MatrixXd extendedLocalMinimum(PointView& view, int rows, int cols,
@@ -425,6 +450,56 @@ void writeMatrix(Eigen::MatrixXd data, std::string filename, double cell_size,
 
         delete [] poRasterData;
     }
+}
+
+Eigen::MatrixXd cleanDSM(Eigen::MatrixXd data)
+{
+    using namespace Eigen;
+    MatrixXd output = data;
+    return output;
+}
+
+Eigen::MatrixXd computeSlope(Eigen::MatrixXd data, double spacing)
+{
+    using namespace Eigen;
+  
+    MatrixXd data2 = padMatrix(data, 1);
+    
+    MatrixXd output(data.rows(), data.cols());
+    output.setConstant(std::numeric_limits<double>::quiet_NaN());
+    
+    for (int r = 1; r < data2.rows()-1; ++r)
+    {
+        for (int c = 1; c < data2.cols()-1; ++c)
+        {
+            double val = data2(r, c);
+            if (std::isnan(val))
+                continue;
+            MatrixXd submatrix(3, 3);
+            submatrix.setConstant(val);
+            submatrix -= data2.block(r-1, c-1, 3, 3);
+            submatrix /= spacing;
+            submatrix(0, 1) /= std::sqrt(2.0);
+            submatrix(1, 0) /= std::sqrt(2.0);
+            submatrix(1, 2) /= std::sqrt(2.0);
+            submatrix(2, 1) /= std::sqrt(2.0);
+            
+            // find max and convert to degrees
+            double maxval = std::numeric_limits<double>::lowest();
+            for (int i = 0; i < submatrix.size(); ++i)
+            {
+                if (std::isnan(submatrix(i)))
+                    continue;
+                if (submatrix(i) > maxval)
+                    maxval = submatrix(i);
+            }
+            if (maxval == std::numeric_limits<double>::lowest())
+                continue;
+            output(r-1, c-1) = std::atan(maxval) * (180.0 / 3.14159);
+        }
+    }
+    
+    return output;
 }
 
 } // namespace eigen

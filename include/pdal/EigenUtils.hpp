@@ -154,8 +154,10 @@ PDAL_DLL uint8_t computeRank(PointView& view, std::vector<PointId> ids,
  * \param bounds the 2D bounds of the PointView.
  * \return the matrix of minimum Z values.
  */
-PDAL_DLL Eigen::MatrixXd createDSM(PointView& view, int rows, int cols,
-                                   double cell_size, BOX2D bounds);
+PDAL_DLL Eigen::MatrixXd createMaxMatrix(PointView& view, int rows, int cols,
+                                         double cell_size, BOX2D bounds);
+PDAL_DLL Eigen::MatrixXd createMinMatrix(PointView& view, int rows, int cols,
+                                         double cell_size, BOX2D bounds);
                                    
 /**
  * \brief Find local minimum elevations by extended local minimum.
@@ -236,6 +238,8 @@ PDAL_DLL Eigen::MatrixXd pointViewToEigen(const PointView& view);
 PDAL_DLL void writeMatrix(Eigen::MatrixXd data, std::string filename,
                           double cell_size, PointViewPtr view, BOX2D bounds);
 
+PDAL_DLL Eigen::MatrixXd cleanDSM(Eigen::MatrixXd data);
+PDAL_DLL Eigen::MatrixXd computeSlope(Eigen::MatrixXd data, double spacing);
 } // namespace eigen
 
 } // namespace pdal

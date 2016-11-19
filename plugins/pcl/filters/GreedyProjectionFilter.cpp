@@ -35,7 +35,6 @@
 #include "GreedyProjectionFilter.hpp"
 
 #include "PCLConversions.hpp"
-#include "pipeline/PCLPipeline.h"
 
 #include <pcl/console/print.h>
 #include <pcl/point_types.h>

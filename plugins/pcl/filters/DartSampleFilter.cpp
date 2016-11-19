@@ -36,7 +36,6 @@
 
 #include "PCLConversions.hpp"
 #include "dartsample/dart_sample.h"
-#include "pipeline/PCLPipeline.h"
 
 #include <pcl/console/print.h>
 #include <pcl/point_types.h>

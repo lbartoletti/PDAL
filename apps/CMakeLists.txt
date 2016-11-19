@@ -5,54 +5,19 @@
 
 cmake_minimum_required(VERSION 2.8)
 
-set(PDAL_SOURCE_DIR ../src)
-
-#------------------------------------------------------------------------------
-# includes
-#------------------------------------------------------------------------------
-
-include_directories(
-    .
-    ../include
-    ../util
-    ${PROJECT_SOURCE_DIR}/io/faux
-    ${PROJECT_SOURCE_DIR}/io/las
-    ${PROJECT_SOURCE_DIR}/kernels
-    ${PROJECT_SOURCE_DIR}/kernels/delta
-    ${PROJECT_SOURCE_DIR}/kernels/diff
-    ${PROJECT_SOURCE_DIR}/kernels/info
-    ${PROJECT_SOURCE_DIR}/kernels/pipeline
-    ${PROJECT_SOURCE_DIR}/kernels/random
-    ${PROJECT_SOURCE_DIR}/kernels/sort
-    ${PROJECT_SOURCE_DIR}/kernels/translate
-)
-
-#------------------------------------------------------------------------------
-# Collect programs to build
-#------------------------------------------------------------------------------
-
-set(PDAL_UTILITY pdal)
-
 #------------------------------------------------------------------------------
 # Configure build targets
 #------------------------------------------------------------------------------
 
-if(PDAL_UTILITY)
-    set(srcs pdal.cpp)
-
-    if(WIN32)
-        list(APPEND srcs ${PDAL_TARGET_OBJECTS})
-    endif()
-
-    list(APPEND PDAL_UTILITIES ${PDAL_UTILITY})
-    if (APPLE AND PDAL_BUNDLE)
-        add_executable(${PDAL_UTILITY} MACOSX_BUNDLE ${srcs})
-    else (APPLE AND PDAL_BUNDLE)
-        add_executable(${PDAL_UTILITY} ${srcs})
-    endif(APPLE AND PDAL_BUNDLE)
-    target_link_libraries(${PDAL_UTILITY} PRIVATE ${PDAL_BASE_LIB_NAME}
-        ${PDAL_UTIL_LIB_NAME})
-endif()
+if (APPLE AND PDAL_BUNDLE)
+    add_executable(pdal MACOSX_BUNDLE pdal.cpp)
+else (APPLE AND PDAL_BUNDLE)
+    add_executable(pdal pdal.cpp) 
+endif(APPLE AND PDAL_BUNDLE)
+target_link_libraries(pdal PRIVATE
+    ${PDAL_BASE_LIB_NAME} ${PDAL_UTIL_LIB_NAME})
+target_include_directories(pdal PRIVATE
+    ${PDAL_INCLUDE_DIR})
 
 #------------------------------------------------------------------------------
 # Targets installation
@@ -67,7 +32,6 @@ else(APPLE AND PDAL_BUNDLE)
 endif(APPLE AND PDAL_BUNDLE)
 
 if(UNIX OR APPLE)
-
     set(PKGCONFIG_LIBRARY_DEFINITIONS "")
     set(PDAL_INCLUDE_DEFINITIONS "-I${CMAKE_INSTALL_PREFIX}/include -I${GDAL_INCLUDE_DIR}")
     set(PKGCONFIG_LIBRARY_DEFINITIONS "${PKGCONFIG_LIBRARY_DEFINITIONS} gdal")
